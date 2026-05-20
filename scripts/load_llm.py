@@ -1,4 +1,3 @@
-# file: model_loader.py
 from langchain_community.chat_models import ChatLlamaCpp
 from huggingface_hub import hf_hub_download
 from langchain_core.callbacks import StreamingStdOutCallbackHandler
