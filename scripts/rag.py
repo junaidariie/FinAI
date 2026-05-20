@@ -27,7 +27,7 @@ class RagPipeline:
         self.pc = Pinecone(api_key=api_key)
         self.index_name = index_name
         self.bm25_retriever = None
-        self.cached_docs = []   # FIX
+        self.cached_docs = []  
 
         self._ensure_index()
 
@@ -88,7 +88,7 @@ class RagPipeline:
 
             split_documents = splitter.split_documents(docs)
 
-            self.cached_docs = split_documents   # FIX
+            self.cached_docs = split_documents   
 
             logger.info(f"Generated {len(split_documents)} chunks.")
 
@@ -121,12 +121,12 @@ class RagPipeline:
             logger.info("All documents deleted successfully.")
 
             self.bm25_retriever = None
-            self.cached_docs = []   # FIX
+            self.cached_docs = []   
 
         except Exception:
             logger.exception("Error deleting all documents.")
 
-    def create_bm25(self, split_docs=None, k=4):   # FIX
+    def create_bm25(self, split_docs=None, k=4):   
         try:
             logger.info("Creating BM25 retriever...")
 
