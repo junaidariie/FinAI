@@ -4,12 +4,13 @@ A fine-tuned **Qwen 2.5 (1.5B)** model for financial question answering, served 
 
 ---
 
-## 📓 Training Notebook
+## 📓 Training Notebook &nbsp;|&nbsp; 🎥 Demo
 
 > GitHub does not render large Jupyter notebooks. The full fine-tuning notebook is hosted on Hugging Face for proper viewing.
 
-**[View Training Notebook on Hugging Face →](https://huggingface.co/YOUR_HF_USERNAME/YOUR_NOTEBOOK_SPACE)**  
-*(Replace this link with your actual HF Space or dataset repo link)*
+**[View Training Notebook on Hugging Face →](https://huggingface.co/spaces/junaid17/FinAI/blob/main/Qwen2_5_financial_finetuning.ipynb)**
+
+[![FinAI Demo](https://img.youtube.com/vi/H0qx3JrcYv8/0.jpg)](https://youtu.be/H0qx3JrcYv8)
 
 ---
 
