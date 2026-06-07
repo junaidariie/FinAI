@@ -22,8 +22,7 @@ A fine-tuned **Qwen 2.5 (1.5B)** model for financial question answering, served 
 ### Datasets Used
 | Dataset | Description |
 |---|---|
-| [`LLukas22/fiqa`](https://huggingface.co/datasets/LLukas22/fiqa) | Financial QA pairs from community forums |
-| [`gbharti/finance-alpaca`](https://huggingface.co/datasets/gbharti/finance-alpaca) | Instruction-following financial dataset |
+| [`sweatSmile/FinanceQA`](https://huggingface.co/datasets/sweatSmile/FinanceQA) | Financial QA dataset |
 
 ### Fine-Tuning Method — QLoRA with Unsloth
 Used **LoRA (Low-Rank Adaptation)** via `unsloth`'s `FastLanguageModel` for memory-efficient fine-tuning:
@@ -31,7 +30,7 @@ Used **LoRA (Low-Rank Adaptation)** via `unsloth`'s `FastLanguageModel` for memo
 ```python
 model = FastLanguageModel.get_peft_model(
     model,
-    r=32,
+    r=64,
     target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
                     "gate_proj", "up_proj", "down_proj"],
     lora_alpha=64,
@@ -48,12 +47,15 @@ model = FastLanguageModel.get_peft_model(
 
 Significant improvements across all metrics after fine-tuning:
 
-| Metric | Base Model | Fine-Tuned | Result |
-|---|---|---|---|
-| PPL ↓ | 28.0700 | **5.8100** | ✅ improved |
-| BLEU ↑ | 2.3573 | **3.8204** | ✅ improved |
-| ROUGE-1 ↑ | 0.2596 | **0.3069** | ✅ improved |
-| ROUGE-L ↑ | 0.1439 | **0.1805** | ✅ improved |
+```
+────────────────────────────────────────────────────────────
+Metric                 Base     Fine-tuned         Result
+────────────────────────────────────────────────────────────
+PPL ↓               16.4500         1.3100     ✓ improved
+BLEU ↑              13.7119        83.0197     ✓ improved
+ROUGE-1 ↑            0.5695         0.9406     ✓ improved
+ROUGE-L ↑            0.5572         0.9385     ✓ improved
+```
 
 ### Metric Plots
 
