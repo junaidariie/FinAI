@@ -7,6 +7,7 @@ from langchain_pinecone import PineconeVectorStore
 from langchain_community.retrievers import BM25Retriever
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from sentence_transformers import CrossEncoder
 
 load_dotenv()
 
@@ -14,6 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 INDEX_NAME = "finance-rag"
+CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 
 class RagPipeline:
@@ -27,13 +29,17 @@ class RagPipeline:
         self.pc = Pinecone(api_key=api_key)
         self.index_name = index_name
         self.bm25_retriever = None
-        self.cached_docs = []  
+        self.cached_docs = []
 
         self._ensure_index()
 
         logger.info("Loading embedding model...")
         self.embeddings = HuggingFaceEmbeddings(model_name=embedding_model)
         logger.info("Embedding model loaded successfully.")
+
+        logger.info("Loading cross-encoder model...")
+        self.cross_encoder = CrossEncoder(CROSS_ENCODER_MODEL)
+        logger.info("Cross-encoder model loaded successfully.")
 
     def _ensure_index(self):
         existing_indexes = self.pc.list_indexes().names()
@@ -147,7 +153,31 @@ class RagPipeline:
             search_kwargs={"k": k}
         )
 
-    def hybrid_retrieve(self, query, dense_k=4, top_k=6):
+    def rerank(self, query: str, docs: list, top_k: int = 6) -> tuple[list, float]:
+        """
+        Re-rank docs using the cross-encoder and return top_k docs
+        along with the highest confidence score (0-1 normalized).
+        """
+        if not docs:
+            return [], 0.0
+
+        pairs = [(query, doc.page_content) for doc in docs]
+        scores = self.cross_encoder.predict(pairs)
+
+        scored_docs = sorted(zip(scores, docs), key=lambda x: x[0], reverse=True)
+
+        top_docs = [doc for _, doc in scored_docs[:top_k]]
+
+        # Normalize top score to 0-1 using sigmoid
+        import math
+        raw_top_score = float(scored_docs[0][0])
+        confidence = round(1 / (1 + math.exp(-raw_top_score)), 4)
+
+        logger.info(f"Cross-encoder reranked {len(docs)} docs → top {len(top_docs)}, confidence={confidence}")
+
+        return top_docs, confidence
+
+    def hybrid_retrieve(self, query, dense_k=6, top_k=6):
         try:
             dense_docs = []
 
@@ -164,7 +194,7 @@ class RagPipeline:
                     self.create_bm25()
                 else:
                     logger.warning("No uploaded docs found. Using direct LLM fallback.")
-                    return []
+                    return [], 0.0
 
             if self.bm25_retriever:
                 bm25_docs = self.bm25_retriever.invoke(query)
@@ -176,13 +206,12 @@ class RagPipeline:
 
             for doc in combined:
                 text = doc.page_content.strip()
-
                 if text not in seen:
                     seen.add(text)
                     unique.append(doc)
 
-            return unique[:top_k]
+            return self.rerank(query, unique, top_k=top_k)
 
         except Exception:
             logger.exception("Error during hybrid retrieval.")
-            return []
+            return [], 0.0

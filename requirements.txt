@@ -9,8 +9,8 @@ langchain-core
 python-multipart
 langchain-huggingface
 huggingface_hub
-rank-bm25 
-sentence-transformers
+rank-bm25
+sentence-transformers>=2.7.0
 pypdf
 pinecone-client
 pinecone

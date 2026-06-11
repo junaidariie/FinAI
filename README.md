@@ -100,12 +100,14 @@ The backend uses **LangGraph** to orchestrate a stateful RAG pipeline with condi
 The chat endpoint streams responses using **Server-Sent Events (SSE)**. Three event types are emitted:
 
 ```
-data: {"type": "metadata", "used_rag": true, "sources": [...], "thread_id": "..."}
+data: {"type": "metadata", "used_rag": true, "sources": [...], "confidence": 0.9312, "thread_id": "..."}
 
 data: {"type": "token", "content": "..."}
 
 data: {"type": "done"}
 ```
+
+**`confidence`** — A sigmoid-normalized score (0.0–1.0) from the cross-encoder reranker reflecting how relevant the top retrieved document is to the query. `0.0` when RAG is not used (direct LLM fallback).
 
 ### `/upload` — Document Ingestion Flow
 
@@ -142,6 +144,37 @@ Combines two complementary retrieval strategies:
 | **BM25** | Keyword / lexical search | Exact term matching, financial jargon |
 
 Results are merged and deduplicated, giving the best of both worlds — semantic understanding and precise keyword matching critical for financial terminology.
+
+### Cross-Encoder Re-ranker — `cross-encoder/ms-marco-MiniLM-L-6-v2`
+
+After hybrid retrieval, all candidate documents are re-scored using a **Cross-Encoder** model before being passed to the LLM.
+
+**Why Cross-Encoder over Bi-Encoder for re-ranking?**
+Bi-encoders (like the embedding model) encode query and document independently — fast but less accurate. A cross-encoder processes the query and document **together**, enabling full attention across both, which produces much more accurate relevance scores.
+
+**Model chosen: `cross-encoder/ms-marco-MiniLM-L-6-v2`**
+
+| Property | Detail |
+|---|---|
+| Size | ~85 MB |
+| Architecture | MiniLM-L6 (6-layer transformer) |
+| Trained on | MS MARCO passage ranking dataset |
+| Strength | High accuracy relevance scoring at very low latency |
+| Why this model | Best accuracy-to-size ratio among MS MARCO cross-encoders; well under 1 GB; production-proven |
+
+**Pipeline after retrieval:**
+```
+Hybrid Docs (Dense + BM25, deduplicated)
+  → Cross-Encoder scores each (query, doc) pair
+  → Sort by score descending
+  → Keep top 6 docs
+  → Sigmoid-normalize top score → confidence (0.0–1.0)
+  → Pass to LLM context
+```
+
+### Confidence Score
+
+The reranker's top relevance score is sigmoid-normalized to a **0.0–1.0 confidence value** and returned in every `/chat/stream` metadata event. This lets the frontend indicate how strongly the retrieved context supports the answer.
 
 ---
 
@@ -218,5 +251,6 @@ The fine-tuned GGUF model is hosted on Hugging Face:
 | Vector DB | Pinecone (Serverless) |
 | Embeddings | `BAAI/bge-base-en-v1.5` |
 | Sparse Retrieval | BM25 (`rank-bm25`) |
+| Re-ranking | Cross-Encoder (`ms-marco-MiniLM-L-6-v2`) |
 | Backend | FastAPI + Uvicorn |
 | Memory | LangGraph `MemorySaver` (per thread_id) |

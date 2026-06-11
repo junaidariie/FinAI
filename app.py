@@ -105,6 +105,7 @@ async def chat_stream(request: ChatRequest):
                         "type": "metadata",
                         "used_rag": chunk["metadata"]["used_rag"],
                         "sources": chunk["metadata"]["sources"],
+                        "confidence": chunk["metadata"]["confidence"],
                         "thread_id": chunk["metadata"]["thread_id"]
                     }
 

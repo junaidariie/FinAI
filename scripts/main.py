@@ -2,9 +2,7 @@ from langgraph.graph import StateGraph, START, END
 from typing import TypedDict, Annotated
 from scripts.rag import RagPipeline
 from scripts.load_llm import get_model
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
-from langgraph.graph.message import add_messages
+from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import MemorySaver
 
 
@@ -24,6 +22,7 @@ class ChatState(TypedDict):
     use_rag: bool
     final_prompt: str
     sources: list
+    confidence: float
 
 
 # Making Nodes
@@ -31,9 +30,9 @@ class ChatState(TypedDict):
 def retrieve_node(state):
     query = state["query"]
 
-    docs = RAG.hybrid_retrieve(query=query, dense_k=3, top_k=3)
+    docs, confidence = RAG.hybrid_retrieve(query=query, dense_k=6, top_k=6)
 
-    return {"retrieved_docs": docs}
+    return {"retrieved_docs": docs, "confidence": confidence}
 
 
 def relevance_node(state):
@@ -116,7 +115,8 @@ def direct_prompt_node(state):
 
     return {
         "final_prompt": prompt,
-        "sources": []
+        "sources": [],
+        "confidence": 0.0
     }
 
 def route_decision(state):
@@ -170,6 +170,7 @@ def stream_chat_response(user_message: str, thread_id: str):
     metadata = {
         "used_rag": state["use_rag"],
         "sources": state["sources"],
+        "confidence": state.get("confidence", 0.0),
         "thread_id": thread_id
     }
 
