@@ -1,3 +1,5 @@
+![FinAI Banner](assets/Gemini_Generated_Image_ck29uuck29uuck29.png)
+
 # FinAI — Financial Intelligence Assistant
 
 A fine-tuned **Qwen 2.5 (1.5B)** model for financial question answering, served via a **FastAPI** backend with a **Hybrid RAG** pipeline powered by **Pinecone** and **LangGraph**.
