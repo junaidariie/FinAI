@@ -53,10 +53,10 @@ Significant improvements across all metrics after fine-tuning:
 ────────────────────────────────────────────────────────────
 Metric                 Base     Fine-tuned         Result
 ────────────────────────────────────────────────────────────
-PPL ↓               16.4500         1.3100     ✓ improved
-BLEU ↑              13.7119        83.0197     ✓ improved
-ROUGE-1 ↑            0.5695         0.9406     ✓ improved
-ROUGE-L ↑            0.5572         0.9385     ✓ improved
+PPL (ans) ↓          1.4700         1.1400     ✓ improved
+ROUGE-1 ↑            0.4756         0.9438     ✓ improved
+ROUGE-L ↑            0.4561         0.9431     ✓ improved
+EM ↑                 0.0333         0.7533     ✓ improved
 ```
 
 ### Metric Plots
