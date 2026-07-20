@@ -57,6 +57,8 @@ PPL (ans) ↓          1.4700         1.1400     ✓ improved
 ROUGE-1 ↑            0.4756         0.9438     ✓ improved
 ROUGE-L ↑            0.4561         0.9431     ✓ improved
 EM ↑                 0.0333         0.7533     ✓ improved
+BERTScore F1 ↑       0.9067         0.9836     ✓ improved
+────────────────────────────────────────────────────────────
 ```
 
 ### Metric Plots
