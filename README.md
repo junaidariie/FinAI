@@ -26,20 +26,24 @@ A fine-tuned **Qwen 2.5 (1.5B)** model for financial question answering, served 
 |---|---|
 | [`sweatSmile/FinanceQA`](https://huggingface.co/datasets/sweatSmile/FinanceQA) | Financial QA dataset |
 
-### Fine-Tuning Method — QLoRA with Unsloth
-Used **LoRA (Low-Rank Adaptation)** via `unsloth`'s `FastLanguageModel` for memory-efficient fine-tuning:
+### Fine-Tuning Method — QLoRA with Hugging Face Transformers
+Used **LoRA (Low-Rank Adaptation)** via Hugging Face `PEFT` and `TRL`'s `SFTTrainer` for memory-efficient fine-tuning:
 
 ```python
-model = FastLanguageModel.get_peft_model(
-    model,
-    r=64,
-    target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
-                    "gate_proj", "up_proj", "down_proj"],
-    lora_alpha=64,
+BNB_CONFIG = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.bfloat16,
+    bnb_4bit_use_double_quant=True,
+)
+
+LORA_CONFIG = LoraConfig(
+    r=32,
+    lora_alpha=32,
     lora_dropout=0.05,
+    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
     bias="none",
-    use_gradient_checkpointing="unsloth",
-    random_state=3407,
+    task_type="CAUSAL_LM",
 )
 ```
 
@@ -53,13 +57,13 @@ Significant improvements across all metrics after fine-tuning:
 ────────────────────────────────────────────────────────────
 Metric                 Base     Fine-tuned         Result
 ────────────────────────────────────────────────────────────
-PPL (ans) ↓          1.4700         1.1400     ✓ improved
-ROUGE-1 ↑            0.4756         0.9438     ✓ improved
-ROUGE-L ↑            0.4561         0.9431     ✓ improved
-EM ↑                 0.0333         0.7533     ✓ improved
-BERTScore F1 ↑       0.9067         0.9836     ✓ improved
+PPL (ans) ↓          1.8300         1.2100     ✓ improved
+BERTScore F1 ↑       0.8642         0.9751     ✓ improved
+LLM Judge ↑          3.9100         4.7200     ✓ improved
 ────────────────────────────────────────────────────────────
 ```
+
+**LLM Judge** — Scored by `llama-3.3-70b-versatile` via Groq, evaluating each answer on correctness and helpfulness (1–5 scale each), averaged into a single score.
 
 ### Metric Plots
 
@@ -68,6 +72,10 @@ BERTScore F1 ↑       0.9067         0.9836     ✓ improved
 ### Improvements Overview
 
 ![Improvements](assets/improvements.png)
+
+### Training Results
+
+![Training Results](assets/training_results.png)
 
 ---
 
@@ -250,7 +258,7 @@ The fine-tuned GGUF model is hosted on Hugging Face:
 |---|---|
 | LLM | Qwen 2.5 1.5B (QLoRA fine-tuned, GGUF) |
 | Inference | `llama-cpp-python` via `ChatLlamaCpp` |
-| Fine-tuning | Unsloth + QLoRA |
+| Fine-tuning | Hugging Face Transformers + PEFT + TRL (QLoRA) |
 | Orchestration | LangGraph |
 | Vector DB | Pinecone (Serverless) |
 | Embeddings | `BAAI/bge-base-en-v1.5` |
