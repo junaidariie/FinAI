@@ -16,3 +16,6 @@ pinecone-client
 pinecone
 langchain-pinecone
 python-dotenv
+matplotlib
+openai>=1.109.1,<2
+ragas>=0.4.4,<1.0

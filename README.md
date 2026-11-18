@@ -2,15 +2,15 @@
 
 # FinAI — Financial Intelligence Assistant
 
-A fine-tuned **Qwen 2.5 (1.5B)** model for financial question answering, served via a **FastAPI** backend with a **Hybrid RAG** pipeline powered by **Pinecone** and **LangGraph**.
+A fine-tuned **Qwen2.5-1.5B-Instruct** model for financial question answering, served via a **FastAPI** backend with a **Hybrid RAG** pipeline powered by **Pinecone** and **LangGraph**.
 
 ---
 
 ## 📓 Training Notebook &nbsp;|&nbsp; 🎥 Demo
 
-> GitHub does not render large Jupyter notebooks. The full fine-tuning notebook is hosted on Hugging Face for proper viewing.
+The notebook documents the fine-tuning, held-out language-model evaluation, and GGUF export.
 
-**[View Training Notebook on Hugging Face →](https://huggingface.co/spaces/junaid17/FinAI/blob/main/Qwen2_5_financial_finetuning.ipynb)**
+**[Open the Qwen2.5-1.5B-Instruct fine-tuning notebook](https://huggingface.co/spaces/junaid17/FinAI/blob/main/Qwen2_5_1_5B_instruct_finance.ipynb)**
 
 [![FinAI Demo](https://img.youtube.com/vi/H0qx3JrcYv8/0.jpg)](https://youtu.be/H0qx3JrcYv8)
 
@@ -18,64 +18,69 @@ A fine-tuned **Qwen 2.5 (1.5B)** model for financial question answering, served 
 
 ## 🧠 Model Fine-Tuning
 
-### Base Model
-- **Qwen 2.5 — 1.5B parameters**
+### Base model and data
 
-### Datasets Used
 | Dataset | Description |
 |---|---|
-| [`sweatSmile/FinanceQA`](https://huggingface.co/datasets/sweatSmile/FinanceQA) | Financial QA dataset |
+| [`virattt/financial-qa-10K`](https://huggingface.co/datasets/virattt/financial-qa-10K) | Financial question-answer pairs with context |
+| [`sweatSmile/FinanceQA`](https://huggingface.co/datasets/sweatSmile/FinanceQA) | Financial QA dataset (gated on Hugging Face) |
 
-### Fine-Tuning Method — QLoRA with Hugging Face Transformers
-Used **LoRA (Low-Rank Adaptation)** via Hugging Face `PEFT` and `TRL`'s `SFTTrainer` for memory-efficient fine-tuning:
+The notebook fine-tunes **[`Qwen/Qwen2.5-1.5B-Instruct`](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct)** using a context-grouped train/evaluation/test split (seed 42) to keep identical contexts out of multiple splits. It reserves 500 examples for evaluation (the first 200 are used for in-training evaluation) and 200 for the held-out test set. Training and evaluation use the same chat template: a financial-assistant system message, a user turn containing context and question, and the answer as the completion.
 
-```python
-BNB_CONFIG = BitsAndBytesConfig(
-    load_in_4bit=True,
-    bnb_4bit_quant_type="nf4",
-    bnb_4bit_compute_dtype=torch.bfloat16,
-    bnb_4bit_use_double_quant=True,
-)
+### QLoRA configuration
 
-LORA_CONFIG = LoraConfig(
-    r=32,
-    lora_alpha=32,
-    lora_dropout=0.05,
-    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
-    bias="none",
-    task_type="CAUSAL_LM",
-)
-```
+| Setting | Notebook value |
+|---|---|
+| Base-model quantization | 4-bit NF4 with double quantization |
+| Compute dtype | BF16 on supported GPUs; otherwise FP16 |
+| LoRA rank / alpha / dropout | `r=64`, `lora_alpha=128`, `lora_dropout=0.05` |
+| LoRA targets | `q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj` |
+| Bias / task | `none` / causal language modeling |
+| Optimizer / learning rate | `paged_adamw_8bit` / `2e-4` |
+| Schedule / warmup | Cosine / 20 warmup steps |
+| Batch / accumulation | Per-device batch 4 (BF16) or 2 (FP16), accumulated to 16 examples per device |
+| Training limit | 1 epoch, capped at 250 steps |
+| Regularization | Weight decay `0.01`; max gradient norm `0.3` |
+| Evaluation/checkpointing | Eval every 50 steps; save every 100 steps; keep at most 2 checkpoints; select best by eval loss |
+| Other settings | `SFTTrainer`; gradient checkpointing; completion-only loss; no packing; output adapter: `qwen2.5-1.5b-instruct-finance-qlora-sft` |
 
 ---
 
-## 📊 Evaluation Results
+## 📊 Evaluation
 
-Significant improvements across all metrics after fine-tuning:
+### Fine-tuned language-model evaluation
 
-```
-────────────────────────────────────────────────────────────
-Metric                 Base     Fine-tuned         Result
-────────────────────────────────────────────────────────────
-PPL (ans) ↓          1.8300         1.2100     ✓ improved
-BERTScore F1 ↑       0.8642         0.9751     ✓ improved
-LLM Judge ↑          3.9100         4.7200     ✓ improved
-────────────────────────────────────────────────────────────
-```
+The notebook compares the base and fine-tuned models on the held-out test data. Perplexity and BERTScore use 200 test examples; the LLM judge scores 100 examples. Lower perplexity is better; higher BERTScore and judge scores are better.
 
-**LLM Judge** — Scored by `llama-3.3-70b-versatile` via Groq, evaluating each answer on correctness and helpfulness (1–5 scale each), averaged into a single score.
+| Metric | Base model | Fine-tuned model | Change |
+|---|---:|---:|---:|
+| Answer perplexity ↓ | 1.90 | 1.38 | 27.4% lower |
+| BERTScore F1 ↑ | 0.9178 | 0.9596 | 4.6% higher |
+| LLM judge ↑ | 3.75 | 4.58 | 22.1% higher |
 
-### Metric Plots
+The judge is `openai/gpt-oss-120b` through Groq. It grades correctness and helpfulness independently on 1–5 scales; the table reports their average.
 
-![Metrics Comparison](assets/metrices.png)
+![Fine-tuning improvements](assets/improvements.png)
 
-### Improvements Overview
+![Base and fine-tuned model metrics](assets/metrices.png)
 
-![Improvements](assets/improvements.png)
+### RAG pipeline evaluation
 
-### Training Results
+The RAG evaluation runs the fine-tuned Qwen model against the 20 question-answer pairs in [`finance_rag_20_question_answer.pdf`](finance_rag_20_question_answer.pdf). The same PDF is loaded as the retrieval corpus. The evaluator uses the existing `RagPipeline` document loader, splitter, BM25 and dense hybrid retrieval, then scores the generated answers with Ragas.
 
-![Training Results](assets/training_results.png)
+Ragas uses the OpenAI-compatible XKIRO endpoint with `mistralai/mistral-small-2603` and `XKIRO_API_KEY` from `.env` as its judge. Answer Relevancy uses the Ragas Hugging Face embedding model `BAAI/bge-small-en-v1.5`. The plotted scores are means over all 20 questions:
+
+| Ragas metric | Mean score |
+|---|---:|
+| Context Precision | 0.9963 |
+| Context Recall | 1.0000 |
+| Faithfulness | 0.7142 |
+| Answer Relevancy | 0.8987 |
+| Context Utilization (context relevance) | 0.8000 |
+
+![Ragas evaluation metrics for 20 questions](assets/rag_metrics.png)
+
+> **Benchmark note:** the PDF contains the reference answers and is also the retrieval corpus, so these results measure this self-retrieval setup rather than a held-out document benchmark.
 
 ---
 
@@ -200,8 +205,8 @@ The reranker's top relevance score is sigmoid-normalized to a **0.0–1.0 confid
 ### Installation
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git
-cd YOUR_REPO
+git clone https://github.com/junaidariie/FinAI.git
+cd FinAI
 pip install -r requirements.txt
 ```
 
@@ -226,17 +231,25 @@ API will be live at `http://localhost:8000`
 ## 🗂️ Project Structure
 
 ```
-FINAL-CODER/
+FinAI/
 ├── assets/
-│   ├── workflow.png        # LangGraph workflow diagram
-│   ├── metrices.png        # Metric comparison plots
-│   └── improvements.png    # Before/after improvement chart
+│   ├── improvements.png
+│   ├── metrices.png
+│   ├── rag_metrics.png
+│   └── workflow.png
 ├── scripts/
-│   ├── load_llm.py         # Model loader (ChatLlamaCpp singleton)
-│   ├── main.py             # LangGraph graph + streaming logic
-│   └── rag.py              # RAG pipeline (Pinecone + BM25)
+│   ├── load_llm.py
+│   ├── main.py
+│   └── rag.py
 ├── Notebook/
-│   └── Qwen2_5_financial_finetuning.ipynb
+│   └── Qwen2_5_1_5B_instruct_finance.ipynb
+├── rag evaluations/
+│   ├── README.md
+│   ├── evaluate_rag.py
+│   ├── plot_results.py
+│   ├── results.csv
+│   └── metrics.png
+├── finance_rag_20_question_answer.pdf
 ├── app.py                  # FastAPI application
 ├── requirements.txt
 └── .env
@@ -246,9 +259,9 @@ FINAL-CODER/
 
 ## 🤗 Model on Hugging Face
 
-The fine-tuned GGUF model is hosted on Hugging Face:
+The fine-tuned GGUF model used by `scripts/load_llm.py` is hosted on Hugging Face:
 
-**[junaid17/qwen2.5-finance-assistant-gguf](https://huggingface.co/junaid17/qwen2.5-finance-assistant-gguf)**
+**[junaid17/qwen2.5-1.5b-instruct-finance-assistant-gguf](https://huggingface.co/junaid17/qwen2.5-1.5b-instruct-finance-assistant-gguf)**
 
 ---
 
@@ -256,7 +269,7 @@ The fine-tuned GGUF model is hosted on Hugging Face:
 
 | Component | Technology |
 |---|---|
-| LLM | Qwen 2.5 1.5B (QLoRA fine-tuned, GGUF) |
+| LLM | Qwen2.5-1.5B-Instruct (QLoRA fine-tuned, GGUF) |
 | Inference | `llama-cpp-python` via `ChatLlamaCpp` |
 | Fine-tuning | Hugging Face Transformers + PEFT + TRL (QLoRA) |
 | Orchestration | LangGraph |
@@ -264,5 +277,6 @@ The fine-tuned GGUF model is hosted on Hugging Face:
 | Embeddings | `BAAI/bge-base-en-v1.5` |
 | Sparse Retrieval | BM25 (`rank-bm25`) |
 | Re-ranking | Cross-Encoder (`ms-marco-MiniLM-L-6-v2`) |
+| RAG evaluation | Ragas + XKIRO `mistralai/mistral-small-2603` |
 | Backend | FastAPI + Uvicorn |
 | Memory | LangGraph `MemorySaver` (per thread_id) |

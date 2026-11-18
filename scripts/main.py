@@ -171,6 +171,11 @@ def stream_chat_response(user_message: str, thread_id: str):
         "used_rag": state["use_rag"],
         "sources": state["sources"],
         "confidence": state.get("confidence", 0.0),
+        "context": state.get("context", ""),
+        "retrieved_chunks": len(state.get("retrieved_docs", [])),
+        "retrieved_contexts": [
+            doc.page_content for doc in state.get("retrieved_docs", [])
+        ],
         "thread_id": thread_id
     }
 

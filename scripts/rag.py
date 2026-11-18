@@ -20,7 +20,12 @@ CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 class RagPipeline:
 
-    def __init__(self, index_name=INDEX_NAME, embedding_model="BAAI/bge-base-en-v1.5"):
+    def __init__(
+        self,
+        index_name=INDEX_NAME,
+        embedding_model="BAAI/bge-base-en-v1.5",
+        namespace=None,
+    ):
         api_key = os.getenv("PINECONE_API_KEY")
 
         if not api_key:
@@ -28,6 +33,7 @@ class RagPipeline:
 
         self.pc = Pinecone(api_key=api_key)
         self.index_name = index_name
+        self.namespace = namespace
         self.bm25_retriever = None
         self.cached_docs = []
 
@@ -65,7 +71,8 @@ class RagPipeline:
     def vector_store(self):
         return PineconeVectorStore(
             index=self.pc.Index(self.index_name),
-            embedding=self.embeddings
+            embedding=self.embeddings,
+            namespace=self.namespace,
         )
 
     def load_docs(self, pdf_path: str):
@@ -118,11 +125,14 @@ class RagPipeline:
 
     def delete_all_docs(self):
         try:
-            logger.info("Deleting ALL documents from Pinecone index...")
+            logger.info("Deleting documents from Pinecone index namespace...")
 
             index = self.pc.Index(self.index_name)
 
-            index.delete(delete_all=True)
+            if self.namespace is None:
+                index.delete(delete_all=True)
+            else:
+                index.delete(delete_all=True, namespace=self.namespace)
 
             logger.info("All documents deleted successfully.")
 

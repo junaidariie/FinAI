@@ -15,8 +15,8 @@ def get_model():
 
         if _llm_instance is None:
             model_path = hf_hub_download(
-                repo_id="junaid17/qwen2.5-finance-assistant-gguf",
-                filename="qwen2.5-finance-assistant-q4_k_m.gguf",
+                repo_id="junaid17/qwen2.5-1.5b-instruct-finance-assistant-gguf",
+                filename="qwen2.5-1.5b-instruct-finance-assistant-q4_k_m.gguf",
             )
 
             logger.info(f"Loading model from: {model_path}")
